@@ -8,6 +8,8 @@ import com.projectkorra.projectkorra.ability.MetalAbility;
 import com.projectkorra.projectkorra.attribute.Attribute;
 import com.projectkorra.projectkorra.configuration.ConfigManager;
 import org.bukkit.event.EventHandler;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.joml.Matrix4f;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -77,6 +79,7 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
         }
         Location usedAt = bPlayer.getPlayer().getLocation();
         ProjectKorra.log.info(bPlayer.getName() + " Used MetalDetector at " + usedAt.getBlockX() + " " + usedAt.getBlockY() + " " + usedAt.getBlockZ() + "");
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, (int) this.duration/50, 0));
         start();
     }
 
@@ -93,15 +96,20 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
         World world = centerblockloc.getWorld();
         if (world == null)return;
          // Ensure world is not null
-        BlockDisplay display = (BlockDisplay) world.spawnEntity(centerblockloc.add(1.5,2,1.5),EntityType.BLOCK_DISPLAY);
+        BlockDisplay display = (BlockDisplay) world.spawnEntity(centerblockloc.add(1.5,2,1.5),EntityType.BLOCK_DISPLAY);//spawn and center the block display
         display.setGlowing(true);
         display.setGlowColorOverride(color);
-        display.setBlock(Bukkit.createBlockData(Material.STONE));
+        display.setBlock(Bukkit.createBlockData(centerblockloc.getBlock().getType()));
         display.setTransformationMatrix(new Matrix4f().scale(0.98f, 0.98f, 0.98f));
         display.setVisibleByDefault(false);
         display.setCustomName("MetalDetector");
         Player viewer = bPlayer.getPlayer();
         viewer.showEntity(plugin, display);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.hasPermission("bending.ability.MetalDetector.viewOthers")) {
+                player.showEntity(plugin, display);
+            }
+        }
         this.highlighted.add(display);
     }
 
@@ -206,7 +214,7 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
 
     @Override
     public String getVersion() {
-        return "1.1";
+        return "1.2";
     }
 
 
@@ -248,6 +256,8 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
 
         // Log that the ability has been loaded
         perm = new Permission("bending.ability.MetalDetector");
+        perm = new Permission("bending.ability.MetalDetector.viewOthers");
+        perm.setDefault(PermissionDefault.FALSE);
         perm.setDefault(PermissionDefault.TRUE);
         ProjectKorra.log.info(this.getName() + " by " + this.getAuthor() + " " + this.getVersion() + " has been loaded!");
 
