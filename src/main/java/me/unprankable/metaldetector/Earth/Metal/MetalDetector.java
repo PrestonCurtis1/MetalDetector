@@ -55,11 +55,26 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
             }
         }
         this.startTime = System.currentTimeMillis();
+        highlighted.clear();
         setFields();
 
         eyeLoc = player.getEyeLocation();
         oreList = findOres(this.eyeLoc, this.reach);
-
+        if (!oreList.isEmpty()) {
+            for (Location ore: oreList) {
+                Color color;
+                if (ore.getWorld().getBlockAt(ore.getBlockX(),ore.getBlockY(),ore.getBlockZ()).getType().name().toLowerCase().contains("gold")){
+                    color = Color.YELLOW;
+                } else if (ore.getWorld().getBlockAt(ore.getBlockX(),ore.getBlockY(),ore.getBlockZ()).getType().name().toLowerCase().contains("copper")){
+                    color = Color.ORANGE;
+                } else if (ore.getWorld().getBlockAt(ore.getBlockX(),ore.getBlockY(),ore.getBlockZ()).getType().name().contains("iron")){
+                    color = Color.SILVER;
+                } else {
+                    color = Color.WHITE;
+                }
+                applyGlowingBlock(ore,color);
+            }
+        }
         Location usedAt = bPlayer.getPlayer().getLocation();
         ProjectKorra.log.info(bPlayer.getName() + " Used MetalDetector at " + usedAt.getBlockX() + " " + usedAt.getBlockY() + " " + usedAt.getBlockZ() + "");
         start();
@@ -75,57 +90,22 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
 
         public void applyGlowingBlock(Location blockloc, Color color) {
         Location centerblockloc = blockloc.clone().add(-1.49, -1.99, -1.49);
-        // Spawn an invisible Shulker at the location
         World world = centerblockloc.getWorld();
-        if (world == null) return; // Ensure world is not null
-        //MagmaCube magmaCube = (MagmaCube) world.spawnEntity(centerblockloc.add(2,2,2), EntityType.MAGMA_CUBE);
+        if (world == null)return;
+         // Ensure world is not null
         BlockDisplay display = (BlockDisplay) world.spawnEntity(centerblockloc.add(1.5,2,1.5),EntityType.BLOCK_DISPLAY);
         display.setGlowing(true);
         display.setGlowColorOverride(color);
         display.setBlock(Bukkit.createBlockData(Material.STONE));
-        Matrix4f transform = new Matrix4f();
-        transform.scale(0.98f,0.98f,0.98f);
-        display.setTransformationMatrix(transform);
+        display.setTransformationMatrix(new Matrix4f().scale(0.98f, 0.98f, 0.98f));
         display.setVisibleByDefault(false);
-        //magmaCube.addPotionEffect(effect);
-        //magmaCube.setAI(false);
-        //magmaCube.setInvulnerable(true);
-        //magmaCube.setGravity(false);
-        //magmaCube.setGlowing(true);
-        //magmaCube.setCustomNameVisible(false);
-        //magmaCube.setSilent(true);
-        //magmaCube.setCollidable(false);
-        //magmaCube.setSize(1);
+        display.setCustomName("MetalDetector");
         Player viewer = bPlayer.getPlayer();
         viewer.showEntity(plugin, display);
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!p.equals(viewer)) {
-                p.hideEntity(plugin, display);
-
-            }
-        }
-        // Schedule the removal of the MagmaCube after the duration (optional)
-    this.highlighted.add(display);
+        this.highlighted.add(display);
     }
 
-    /*public void applyGlowingBlock(Location loc, Player viewer) {
-        ProjectKorra.log.info("ApplyGlowingBlock");
-        // Spawn the display entity (can be ItemDisplay, BlockDisplay, or TextDisplay)
-        BlockDisplay displayEntity = (BlockDisplay) loc.getWorld().spawnEntity(loc, EntityType.ITEM_DISPLAY);
 
-        // Make the display entity invisible and glowing
-        displayEntity.setVisibleByDefault(false);
-        displayEntity.setGlowing(true);
-
-        // Show it only to the viewer
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!p.equals(viewer)) {
-                p.hideEntity(plugin, displayEntity);  // Hide from other players
-            } else {
-                p.showEntity(plugin, displayEntity);  // Show only to the specified player
-            }
-        }
-    }*/
 
     public boolean MetalBendable(Material material){
         return isMetal(material);
@@ -156,29 +136,22 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
     public void progress() {
         long currentTime = System.currentTimeMillis();
         long elapsedTime = currentTime - startTime;
-
         // Check if a second has passed since the last countdown log
         if (elapsedTime >= duration | !player.isSneaking()) {
             // Ability duration has elapsed, deactivate the ability
+
             endMD();
         }else {
-            // Check if oreList is empty before iterating over it
-            if (!oreList.isEmpty()) {
-                for (int index = 0; index < oreList.size(); index++) {
-                    Location ore = oreList.get(index);
-                    Color color;
-                    if (ore.getWorld().getBlockAt(ore.getBlockX(),ore.getBlockY(),ore.getBlockZ()).getType().name().toLowerCase().contains("gold")){
-                        color = Color.YELLOW;
-                    } else if (ore.getWorld().getBlockAt(ore.getBlockX(),ore.getBlockY(),ore.getBlockZ()).getType().name().toLowerCase().contains("copper")){
-                        color = Color.ORANGE;
-                    } else if (ore.getWorld().getBlockAt(ore.getBlockX(),ore.getBlockY(),ore.getBlockZ()).getType().name().contains("iron")){
-                        color = Color.SILVER;
-                    } else {
-                        color = Color.WHITE;
-                    }
-                    applyGlowingBlock(ore,color);
+            for (int index = 0; index < highlighted.size(); index++) {
+                BlockDisplay display = highlighted.get(index);
+                if (display.getLocation().getBlock().getType() == Material.AIR) {
+
+                    display.remove();
+                    highlighted.remove(index);
+                    oreList.remove(index);
                 }
             }
+
         }
 
         // Ability logic for each tick goes here
@@ -196,11 +169,12 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
 
     @Override
     public void stop() {
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "kill @e[type=minecraft:block_display,name=\"MetalDetector\"]");
+        endMD();
         ProjectKorra.log.info("Successfully disabled " + getName() + "by" + getAuthor());
         // Clean up any resources or effects when the ability is manually stopped
         plugin.getServer().getPluginManager().removePermission(this.perm);
         HandlerList.unregisterAll(this.MDL);
-        endMD();
     }
 
 
