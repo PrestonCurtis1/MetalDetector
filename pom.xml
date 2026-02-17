@@ -37,7 +37,7 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.projectkorra</groupId>
+            <groupId>com.projectkorra</groupId>
             <artifactId>projectkorra</artifactId>
             <version>v1.11.2</version>
             <scope>provided</scope>
