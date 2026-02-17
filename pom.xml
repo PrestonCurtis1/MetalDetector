@@ -39,7 +39,7 @@
         <dependency>
             <groupId>com.projectkorra</groupId>
             <artifactId>projectkorra</artifactId>
-            <version>v1.11.2</version>
+            <version>1.12.0</version>
             <scope>provided</scope>
         </dependency>
         <!--
