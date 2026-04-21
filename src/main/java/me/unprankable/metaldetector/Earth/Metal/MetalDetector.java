@@ -18,11 +18,14 @@ import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.*;
+import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
+import java.lang.reflect.Method;
 import java.util.*;
 import static com.projectkorra.projectkorra.ProjectKorra.plugin;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -87,7 +90,64 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
     public void setFields(){
         this.cooldown = ConfigManager.getConfig().getLong(path + "Cooldown");
         this.duration = ConfigManager.getConfig().getLong(path+"Duration");
-        this.reach = ConfigManager.getConfig().getInt(path+"Reach");
+        int scrollsProgress = getScrollsProgress(player.getUniqueId());
+        int unlockCount = ConfigManager.getConfig().getInt(path + "PKScrollUnlockCount");
+        ProjectKorra.log.info("Scrolls Progress: " + scrollsProgress + " Unlock Count: " + unlockCount);
+        if (scrollsProgress == 0) {//this mean either pkscrollls isn't on server or the player has no progress
+            this.reach = ConfigManager.getConfig().getInt(path+"Reach");
+        } else {
+            int additionalReach = scrollsProgress - unlockCount;// 5 is default unlockcount for pkscrolls
+            if (additionalReach < 0) {
+                additionalReach = 0;
+            }
+            this.reach = ConfigManager.getConfig().getInt(path+"Reach") + additionalReach;
+        }
+        ProjectKorra.log.info("Cooldown: " + this.cooldown + " Duration: " + this.duration + " Reach: " + this.reach);
+    }
+
+    public int getScrollsProgress(UUID uuid) {
+        Player target = Bukkit.getPlayer(uuid);
+        if (target == null) {
+            return 0;
+        }
+
+        NamespacedKey progressKey = NamespacedKey.fromString("projectkorrascrolls:progress_metaldetector");
+        if (progressKey == null) {
+            return 0;
+        }
+
+        Integer intProgress = target.getPersistentDataContainer().get(progressKey, PersistentDataType.INTEGER);
+        if (intProgress != null) {
+            return Math.max(0, intProgress);
+        }
+
+        Long longProgress = target.getPersistentDataContainer().get(progressKey, PersistentDataType.LONG);
+        if (longProgress != null) {
+            if (longProgress <= 0L) {
+                return 0;
+            }
+            return (int) Math.min(Integer.MAX_VALUE, longProgress);
+        }
+
+        String stringProgress = target.getPersistentDataContainer().get(progressKey, PersistentDataType.STRING);
+        if (stringProgress != null) {
+            try {
+                return Math.max(0, Integer.parseInt(stringProgress));
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+
+        return 0;
+    }
+
+    private void addConfigComment(Object config, String key, List<String> comments) {
+        try {
+            Method setComments = config.getClass().getMethod("setComments", String.class, List.class);
+            setComments.invoke(config, key, comments);
+        } catch (ReflectiveOperationException ignored) {
+            // Config implementation does not support comments.
+        }
     }
 
 
@@ -177,7 +237,7 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
 
     @Override
     public void stop() {
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "kill @e[type=minecraft:block_display,name=\"MetalDetector\"]");
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "minecraft:kill @e[type=minecraft:block_display,name=\"MetalDetector\"]");
         endMD();
         ProjectKorra.log.info("Successfully disabled " + getName() + "by" + getAuthor());
         // Clean up any resources or effects when the ability is manually stopped
@@ -251,6 +311,9 @@ public class MetalDetector extends MetalAbility implements AddonAbility,Listener
         ConfigManager.defaultConfig.get().addDefault(path + "Cooldown", 5000);
         ConfigManager.defaultConfig.get().addDefault(path + "Duration", 3000);
         ConfigManager.defaultConfig.get().addDefault(path + "Reach",10);
+        // Only used when ProjectKorra Scrolls is installed on your server.
+        ConfigManager.defaultConfig.get().addDefault(path + "PKScrollUnlockCount", 5);
+        addConfigComment(ConfigManager.defaultConfig.get(), path + "PKScrollUnlockCount", Collections.singletonList("Only used when ProjectKorra Scrolls is installed on your server."));
         // Save the default configuration
         ConfigManager.defaultConfig.save();
 
